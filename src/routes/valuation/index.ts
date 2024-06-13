@@ -1,73 +1,78 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { VehicleValuationRequest } from './types/vehicle-valuation-request';
-import { fetchValuationFromSuperCarValuation } from '@app/super-car/super-car-valuation';
-import { VehicleValuation } from '@app/models/vehicle-valuation';
+import { fetchValuationWithFallback } from '@app/utils/fetch-valuation-with-fallback';
 
 export function valuationRoutes(fastify: FastifyInstance) {
+  fastify.decorate('fetchValuationWithFallback', fetchValuationWithFallback);
+  
   fastify.get<{
-    Params: {
-      vrm: string;
-    };
-  }>('/valuations/:vrm', async (request, reply) => {
-    const valuationRepository = fastify.orm.getRepository(VehicleValuation);
-    const { vrm } = request.params;
-
-    if (vrm === null || vrm === '' || vrm.length > 7) {
-      return reply
-        .code(400)
-        .send({ message: 'vrm must be 7 characters or less', statusCode: 400 });
-    }
-
-    const result = await valuationRepository.findOneBy({ vrm: vrm });
-
-    if (result == null) {
-      return reply
-        .code(404)
-        .send({
-          message: `Valuation for VRM ${vrm} not found`,
-          statusCode: 404,
-        });
-    }
-
-    return result;
-  });
+    Params: { vrm: string };
+  }>('/valuations/:vrm', getValuationHandler);
 
   fastify.put<{
     Body: VehicleValuationRequest;
-    Params: {
-      vrm: string;
-    };
-  }>('/valuations/:vrm', async (request, reply) => {
-    const valuationRepository = fastify.orm.getRepository(VehicleValuation);
-    const { vrm } = request.params;
-    const { mileage } = request.body;
+    Params: { vrm: string };
+  }>('/valuations/:vrm', putValuationHandler);
+}
 
-    if (vrm.length > 7) {
-      return reply
-        .code(400)
-        .send({ message: 'vrm must be 7 characters or less', statusCode: 400 });
+export async function getValuationHandler(
+  request: FastifyRequest<{ Params: { vrm: string } }>,
+  reply: FastifyReply
+) {
+  const { vrm } = request.params;
+
+  if (!vrm || vrm.length > 7) {
+    return reply.code(400).send({ message: 'VRM must be 7 characters or less', statusCode: 400 });
+  }
+
+  try {
+    const result = await request.server.vehicleValuationRepository.findByVrm(vrm);
+
+    if (!result) {
+      return reply.code(404).send({ message: `Valuation for VRM ${vrm} not found`, statusCode: 404 });
     }
 
-    if (mileage === null || mileage <= 0) {
-      return reply
-        .code(400)
-        .send({
-          message: 'mileage must be a positive number',
-          statusCode: 400,
-        });
-    }
+    return result;
+  } catch (error) {
+    request.server.log.error('Error retrieving valuation:', error);
+    return reply.code(500).send({ message: 'Internal Server Error', statusCode: 500 });
+  }
+}
 
-    const valuation = await fetchValuationFromSuperCarValuation(vrm, mileage);
+export async function putValuationHandler(
+  request: FastifyRequest<{ Body: VehicleValuationRequest; Params: { vrm: string } }>,
+  reply: FastifyReply
+) {
+  const { vrm } = request.params;
+  const { mileage } = request.body;
 
-    // Save to DB.
-    await valuationRepository.insert(valuation).catch((err) => {
-      if (err.code !== 'SQLITE_CONSTRAINT') {
-        throw err;
+  if (vrm.length > 7) {
+    return reply.code(400).send({ message: 'VRM must be 7 characters or less', statusCode: 400 });
+  }
+
+  if (!mileage || mileage <= 0) {
+    return reply.code(400).send({ message: 'Mileage must be a positive number', statusCode: 400 });
+  }
+
+  try {
+    let valuation = await request.server.vehicleValuationRepository.findByVrm(vrm);
+
+    if (!valuation) {
+      valuation = await request.server.fetchValuationWithFallback(vrm, mileage);
+
+      try {
+        await request.server.vehicleValuationRepository.insert(valuation);
+      } catch (err: any) {
+        if (err.code !== 'SQLITE_CONSTRAINT') {
+          throw err;
+        }
       }
-    });
+    }
 
-    fastify.log.info('Valuation created: ', valuation);
-
+    request.server.log.info('Valuation created: ', valuation);
     return valuation;
-  });
+  } catch (error) {
+    request.server.log.error('Error creating valuation:', error);
+    return reply.code(503).send({ message: 'Service Unavailable', statusCode: 503 });
+  }
 }

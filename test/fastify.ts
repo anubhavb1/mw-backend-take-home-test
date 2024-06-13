@@ -1,13 +1,14 @@
-import { beforeAll, afterAll } from 'vitest'
-import { app } from '@app/app'
+import { beforeAll, afterAll } from 'vitest';
+import { FastifyInstance } from 'fastify';
+import { app } from '@app/app';
 
-export const fastify = app()
+export let fastify: FastifyInstance;
 
 beforeAll(async () => {
-  // called once before all tests run
-  await fastify.ready()
-})
+  fastify = await app();
+  await fastify.ready();
+});
+
 afterAll(async () => {
-  // called once after all tests run
-  await fastify.close()
-})
+  await fastify.close();
+});

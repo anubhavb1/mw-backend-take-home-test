@@ -18,6 +18,6 @@ export async function fetchValuationFromSuperCarValuation(
   valuation.vrm = vrm;
   valuation.lowestValue = response.data.valuation.lowerValue;
   valuation.highestValue = response.data.valuation.upperValue;
-
+  valuation.provider = 'SuperCar Valuations';// hardcoded value for the new provider attribute
   return valuation;
 }

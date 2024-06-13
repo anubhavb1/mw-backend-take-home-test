@@ -119,4 +119,67 @@ The URI for this test stub in Mocky is https://run.mocky.io/v3/0dfda26a-3a5a-43e
 
 
 # Candidate Notes
-Here is a place for you to put any notes regarding the changes you made and the reasoning and what further changes you wish to suggest.
+Notes on Changes and Further Suggestions
+
+Changes Made:
+
+Failover Mechanism:
+
+Implemented a failover mechanism to switch to Premium Car Valuations when the failure rate of SuperCar Valuations exceeds 50%.
+Ensured the failure rate is tracked and the system reverts to SuperCar Valuations after a configurable time, resetting the failure rate.
+
+503 Service Unavailable:
+
+Updated the service to return a 503 error if both providers are unreachable or return a 5xx error.
+
+Cost Saving on PUT Operation:
+
+Modified the PUT operation to check for existing valuations before calling any providers, to save costs.
+
+Provider Name Persistence:
+
+Added functionality to store and return the name of the provider used for the valuation to increase customer confidence.
+
+Backward Compatibility:
+
+Ensured the service remains tolerant of older records without provider details.
+
+Code Refactoring:
+
+Refactored the code for better readability, maintainability, and extensibility.
+
+Audit Logging:
+
+Introduced a ProviderLogs table to store:
+Request date and time
+Request duration
+Request URL
+Response code
+Error code/message (if applicable)
+Name of the provider
+Logs are correlated to a VRM, supporting multiple logs per VRM.
+
+Further Suggestions:
+
+Scalability in Multi-Node Clusters:
+
+Implement a distributed cache or database to track failure rates across all nodes.
+Use a service mesh like Istio for network-level circuit breaker patterns.
+Implement asynchronous logging with message queues for better scalability.
+
+Enhanced Monitoring and Alerting:
+
+Integrate with monitoring tools like Prometheus and Grafana for real-time tracking and alerting on service performance and failures.
+
+Improved Error Handling:
+
+Enhance error handling mechanisms to provide more detailed error messages and better user experience during provider outages.
+
+Performance Optimization:
+
+Conduct performance testing to identify and optimize any bottlenecks, especially under high load conditions.
+
+Documentation and Training:
+
+Ensure comprehensive documentation is available for the new features and mechanisms.
+Provide training sessions for the development and operations teams on the new failover mechanism and auditing features.
